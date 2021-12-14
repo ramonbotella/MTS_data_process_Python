@@ -1,4 +1,8 @@
-#! python3
+"""
+Modified on Tue Dec 14 21:01:08 2021
+
+@author: Ramon Botella, Ph.D.
+"""
 ## MTS_cyclic.py - A Python script to process
 ##                 data from cyclic testing
 ##                 from an MTS multiuprupose loading frame.
