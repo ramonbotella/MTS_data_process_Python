@@ -1,10 +1,10 @@
 #! python3
-# cyclictestMTSuniversal - A Python script to process
-#                          data from cyclic testing
-#                          from an MTS multiuprupose loading frame.
-#
-###########################################################################
+## MTS_cyclic.py - A Python script to process
+##                 data from cyclic testing
+##                 from an MTS multiuprupose loading frame.
 ##
+###########################################################################
+##        Description:
 ##        The software from the MTS hydraulic press employed
 ##        for asphalt materials testing at the Road Reseach Laboratory
 ##        of the UPC-BarcelonaTech acquires detailed data every certain
