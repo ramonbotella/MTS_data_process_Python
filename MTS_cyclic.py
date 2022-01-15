@@ -1,14 +1,10 @@
-"""
-Modified on Tue Dec 14 21:01:08 2021
-
-@author: Ramon Botella, Ph.D.
-"""
-## MTS_cyclic.py - A Python script to process
-##                 data from cyclic testing
-##                 from an MTS multiuprupose loading frame.
-##
+#! python3
+# cyclictestMTSuniversal - A Python script to process
+#                          data from cyclic testing
+#                          from an MTS multiuprupose loading frame.
+#
 ###########################################################################
-##        Description:
+##
 ##        The software from the MTS hydraulic press employed
 ##        for asphalt materials testing at the Road Reseach Laboratory
 ##        of the UPC-BarcelonaTech acquires detailed data every certain
@@ -29,15 +25,12 @@ Modified on Tue Dec 14 21:01:08 2021
 ##        to different column distributions, names, units, etc,…
 ##
 ##        In the current version this script can deal with two different
-##        data file structures and returns the ‘specimenprocess.dat’ file.
-##        The result file is a comma separated file where the following
-##        values for each recorded cycle are reported: Cycle number,
-##        piston displacement amplitude in mm, force amplitude in kgf,
-##        hysteresis loop area in mm·kgf, phase angle in the first
-##        quadrant in degrees , maximum and minimum displacement during
-##        the cycle in mm, maximum and minimum force registered during
-##        the cycle in kgf, and loading rate in mm/min (speed of the
-##        piston peak-valley).
+##        data file structures and returns two result files with user-choice
+##        name '.csv’ and 'xlsx'. In addition the script plots the fatigue curve
+##        and finds the failure point by detecting the maximun curvature
+##        point on the second part of the curve using kneedle package. The '.xlsx'
+##        contains the main parameters of interest, the plot of the fatigue curve
+##        and the failure point coordinates.
 ##
 ##        Sample data files with the two data structures the script
 ##        accepts can be found on the repository.
@@ -50,6 +43,10 @@ import pandas as pd
 from scipy.optimize import leastsq                                      
 from tkinter import filedialog
 from tkinter import *
+import matplotlib.pyplot as plt
+import os
+from kneed import KneeLocator
+
 
 # Opens window dialog to indicate the location and name of the data file
 root = Tk()
@@ -97,6 +94,27 @@ while True:
         else:
                 break                
 
+while True:
+        try:
+                side1 = float(input('Enter dimension 1 in mm: '))
+        except ValueError:
+                print("""Sorry, seems like you didn't type a number. Please, try again:""")
+                print('###############################################################')
+                continue
+        else:
+                break
+
+while True:
+        try:
+                side2 = float(input('Enter dimension 2 in mm: '))
+        except ValueError:
+                print("""Sorry, seems like you didn't type a number. Please, try again:""")
+                print('###############################################################')
+                continue
+        else:
+                break
+
+crossSection = side1*side2
 omega = frequency*2*np.pi
 
 if language == 'e':
@@ -121,6 +139,9 @@ cycleData = []
 points = df.loc[df[timeName]== pointName]
 points = points.astype({dispName: int})
 
+# Create dir to store png of hysteresis loops
+##os.mkdir('loopAnimation')
+
 for index,row in points.iterrows():
         # Isolates the data block for corresponding cycle
         datacycle = df.iloc[(index+3):(index+row[1]+3)]
@@ -135,6 +156,9 @@ for index,row in points.iterrows():
         dispmax = datacycle[:,1].max()
         forcemax = datacycle[:,2].max()                                  
         forcemin = datacycle[:,2].min()                                 
+        stressamp = forceamp*9.81/crossSection
+        stressmin = forcemin*9.81/crossSection
+        stressmax = forcemax*9.81/crossSection
 
         # Computation of the hysteresis loop area using the
         # shoe-lace formula aka Gauss determinant formula
@@ -188,18 +212,134 @@ for index,row in points.iterrows():
                 phase = 180 - phase
 
         # Appends the data from the cycle to the cycleData list        
-        cycleData = cycleData + [[                                       
-                datacycle[0,(numberRows-1)],dispamp, forceamp,          
-                loop,phase,dispmax,dispmin,forcemax,forcemin,
-                60*(dispmax-dispmin)/0.05]]
-                                                                        
+        cycleData = cycleData + [[datacycle[0,(numberRows-1)],
+                                  dispamp, forceamp,stressamp,
+                                  loop,phase,dispmax,dispmin,
+                                  forcemax,stressmax,forcemin,
+                                  stressmin,60*(dispmax-dispmin)/0.05]]
+##        plt.plot(strain,force)
+##        plt.xlabel('Displacement (mm)')
+##        plt.ylabel('Force (kgf)')
+##        plt.title('Evolution of the hysteresis loop with the number of cycles')
+##        plt.savefig('loopAnimation/loop'+str(int(datacycle[0,(numberRows-1)]))+'.png')
+##        plt.clf()
 # Stores data into a specimenprocess.dat    
 cycleData = np.asarray(cycleData)                                  
-np.savetxt('specimenprocessed.dat',cycleData, delimiter=',',newline='\r\n',
-           header="""Cycle,Disp amp.(mm),Force amp. (kgf),\
-           Loop area (mm·kgf),Phase (º),Disp. max. (mm),Disp. min. (mm),\
-           Force max. (kgf),Force min. (kgf),Loading rate (mm/min)""")                      
+               
+# Create a list with name of columns of results file
+colNames = ['Cycle','Disp amp.(mm)','Force amp. (kgf)','Stress amp. (MPa)',
+            'Loop area (mm*kgf)','Phase (º)','Disp. max. (mm)',
+            'Disp. min. (mm)','Force max. (kgf)','Stress max. (MPa)',
+            'Force min. (kgf)','Stress min. (MPa)','Loading rate (mm/min)']
 
-# Prints a remainder of where the data has been stored
-print("""The processed data has been saved into the file 'specimenprocessed.dat'""")
+# Convert results to a pandas dataframe and store it in a csv file
+df_res = pd.DataFrame(data=cycleData, columns=colNames) 
 
+# Record the cross-section area in the last column, first row
+df_res['Cross-section area (mm^2)'] = ''
+df_res.iloc[0,-1] = crossSection
+
+# Extracts the 2nd half of the data to calculate failure point
+# as the point of max curvature
+
+X = df_res.iloc[int(df_res.shape[0]/2):,0]
+Y = df_res.loc[X.index[0]:,'Disp. min. (mm)']
+
+# Max curvature locator
+kneedle = KneeLocator(X,Y, S = 1.0, curve = 'concave', direction = 'decreasing')
+
+# Find Y for knee C point
+failureCycle = round(kneedle.knee)
+f = np.polyfit(X,Y,9)
+p = np.poly1d(f)
+failureDisp = p(failureCycle)
+
+# Stores the key parameters of the test in first row and last columns of the dataframe
+df_res['Failure cycle'] = ''
+df_res.iloc[0,-1] = failureCycle
+
+df_res['Mean Force max-min (kgf)'] = ''
+df_res.iloc[0,-1] = 2*df_res['Force amp. (kgf)'].mean()
+
+df_res['Mean loading rate (mm/min)'] = ''
+df_res.iloc[0,-1] = df_res['Loading rate (mm/min)'].mean()
+
+df_res['Mean Stress max-min (MPa)'] = ''
+df_res.iloc[0,-1] = 2*df_res['Stress amp. (MPa)'].mean()
+
+# Input specimen reference to name results files
+fileNameRes = str(input('Enter specimen reference:'))
+
+# Stores dataframe in csv file
+df_res.to_csv(fileNameRes+'.csv',index = False, sep=';')
+
+# Stores dataframe in xlsx file, plots fatigue curve and failure point
+
+writer = pd.ExcelWriter(fileNameRes+'.xlsx', engine='xlsxwriter')
+
+df_res.to_excel(writer, sheet_name='Processed_data', index=False)
+workbook = writer.book
+worksheet = writer.sheets['Processed_data']
+
+worksheet.write('S1','Failure Displacement (mm)')
+worksheet.write('S2',failureDisp)
+
+chart = workbook.add_chart({'type':'scatter'})
+
+chart.add_series({'categories':'=Processed_data!A2:A10000',
+                  'values':'=Processed_data!H2:H10000',
+                  'name': fileNameRes
+                   })
+
+chart.add_series({'categories':'Processed_data!$O$2',
+                  'values':'=Processed_data!$S$2',
+                  'name': 'Failure',
+                  'marker': {'type': 'square',
+                             'size': 8,
+                             'border': {'color': 'black'},
+                             'fill':   {'color': 'red'}},
+                  'data_labels': {'value': False,
+                                  'category': True,
+                                  'num_format': '#,##0',
+                                  'border': {'color': 'red'},
+                                  'fill':   {'color': 'yellow'}},
+                   })
+chart.set_x_axis({
+    'name': 'Cycle',
+    'name_font': {'size': 14, 'bold': False},
+    'num_font':  {'italic': False },
+    'num_format': '#,##0'
+})
+
+chart.set_y_axis({
+    'name': 'Min. Displacement (mm)',
+    'name_font': {'size': 14, 'bold': False},
+    'num_font':  {'italic': False },
+    'crossing':'min',
+    'num_format': '#,##0.0'
+})
+
+chart.set_size({'width': 720, 'height': 400})
+
+worksheet.insert_chart('C10',chart)
+
+workbook.close()
+
+
+print("""The results have been stored in """+ fileNameRes +""".csv and """+ fileNameRes +""".xlsx files""")
+print("The failure cycle is: " + str(failureCycle))
+
+# Plots the shape of the 2nd part of the curve and the failure point
+plt.plot(X,Y,'-',failureCycle,failureDisp,'+')
+plt.title('Curvature analysis to find failure cycle')
+ax = plt.gca()
+ax.set_facecolor((0.898, 0.898, 0.898))
+fig = plt.gcf()
+plt.xlabel('Cycles')
+plt.ylabel('Displacement (mm)')
+plt.text(failureCycle, failureDisp, str(failureCycle))
+plt.show()
+
+
+df_res.plot(x='Cycle',y='Disp. min. (mm)')
+plt.show()
