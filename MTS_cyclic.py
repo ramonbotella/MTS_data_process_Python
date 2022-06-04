@@ -1,51 +1,43 @@
-#! python3
-# cyclictestMTSuniversal - A Python script to process
-#                          data from cyclic testing
-#                          from an MTS multiuprupose loading frame.
-#
-###########################################################################
-##
-##        The software from the MTS hydraulic press employed
-##        for asphalt materials testing at the Road Reseach Laboratory
-##        of the UPC-BarcelonaTech acquires detailed data every certain
-##        number of points (typically, every 100 cycles). For each
-##        cycle acquired, the software registers approximately 50 data
-##        points (1 data point each (freq.*50)^1 seconds). This produces
-##        large data files where meaningful data is partitioned in blocks
-##        of 50 data points, with blank and descriptive rows containing
-##        strings in between. The fact that the number of data points
-##        acquired in each cycle fluctuates between 49 and 51,
-##        complicates the automatization of computing the main parameters
-##        that describe each cycle (force, displacement amplitudes and
-##        delay between the two of them, i.e., phase angle).
-##
-##        This script automatizes this process. This script is tailored
-##        to the most common data file structures in the Road Reseach
-##        Laboratory  of the UPC-BarcelonaTech, but it can be easy adapted
-##        to different column distributions, names, units, etc,…
-##
-##        In the current version this script can deal with two different
-##        data file structures and returns two result files with user-choice
-##        name '.csv’ and 'xlsx'. In addition the script plots the fatigue curve
-##        and finds the failure point by detecting the maximun curvature
-##        point on the second part of the curve using kneedle package. The '.xlsx'
-##        contains the main parameters of interest, the plot of the fatigue curve
-##        and the failure point coordinates.
-##
-##        Sample data files with the two data structures the script
-##        accepts can be found on the repository.
-##
-###########################################################################
+"""This module processes data of cyclic tests performed on a MTS multiuprupose loading frame.
 
-import numpy as np, math as m
+The software from the MTS hydraulic press employed
+for asphalt materials testing at the Road Reseach Laboratory
+of the UPC-BarcelonaTech acquires detailed data every certain
+number of points (typically, every 100 cycles). For each
+cycle acquired, the software registers approximately 50 data
+points (1 data point each (freq.*50)^1 seconds). This produces
+large data files where meaningful data is partitioned in blocks
+of 50 data points, with blank and descriptive rows containing
+strings in between. The fact that the number of data points
+acquired in each cycle fluctuates between 49 and 51,
+complicates the automatization of computing the main parameters
+that describe each cycle (force, displacement amplitudes and
+delay between the two of them, i.e., phase angle).
+
+This script automatizes this process. This script is tailored
+to the most common data file structures in the Road Reseach
+Laboratory  of the UPC-BarcelonaTech, but it can be easy adapted
+to different column distributions, names, units, etc,…
+
+In the current version this script can deal with two different
+data file structures and returns two result files with user-choice
+name '.csv’ and 'xlsx'. In addition the script plots the fatigue curve
+and finds the failure point by detecting the maximun curvature
+point on the second part of the curve using kneedle package. The '.xlsx'
+contains the main parameters of interest, the plot of the fatigue curve
+and the failure point coordinates.
+"""
 import math as m
+import matplotlib.pyplot as plt
+import numpy as np
+import os
 import pandas as pd
+
+from kneed import KneeLocator
 from scipy.optimize import leastsq                                      
 from tkinter import filedialog
 from tkinter import *
-import matplotlib.pyplot as plt
-import os
-from kneed import KneeLocator
+
 
 
 # Opens window dialog to indicate the location and name of the data file
